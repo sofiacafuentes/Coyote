@@ -1,0 +1,13 @@
+---
+title: "Coyotepark"
+output: html_document
+---
+
+```{r loading_data}
+
+library(here)
+library(tidyverse)
+hookworm <- read.csv(here("Data","hw_data_for_gabby.csv"))
+animal_info <- read.csv(here("Data","carcasses_5-7-25.csv"))
+
+```
