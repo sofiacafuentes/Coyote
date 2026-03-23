@@ -4,10 +4,75 @@ output: html_document
 ---
 
 ```{r loading_data}
-
 library(here)
 library(tidyverse)
+library(ggplot2)
+library(ggmap)
+library(mapdata)
+library(maps)
+library(mapproj)
 hookworm <- read.csv(here("Data","hw_data_for_gabby.csv"))
 animal_info <- read.csv(here("Data","carcasses_5-7-25.csv"))
 #testing gabby github issue
+```
+
+```{r combining_datasets}
+#we know we'll want one datasheet that has both the hookworm data for each coyote, but also the metadata (ex: lat/long, animal size, etc). We can combine our datasets by either the 'Sample.ID' column or the 'Prep.Number' column, but in order to work, the entries have to match EXACTLY, and I noticed in the hookworm dataframe, the Sample.ID entries are lowercase, whereas in the animal_info dataframe, they're uppercase. So I'm going to combine the two sheets using the Prep.Number column. 
+
+coyote_combo<-merge(hookworm, animal_info, by.x = "Prep.Number", by.y = "Prep_Number", all.x = TRUE)
+View(coyote_combo)
+
+#yay, that worked! now i'm going to tidy the datasheet and remove columns that we don't need (not necessary, but makes it simpler to work with imo)
+
+coy_trim <- coyote_combo %>%
+  select(c(Prep.Number, Sample.ID, Hookworm..F., Hookworm..M., Total.Hookworms, Date_of_death, County_approximate._ocation, City_approximate_location, Latitude, Longitude, Sex, Age, Total_length_.mm., Weight_.g., Body_condition_.1.5.)) %>% #this long list is all the variables I want to keep from the dataset!
+    janitor::clean_names() #this makes all the labelling tidy + consistent 
+View(coy_trim)
+
+#unfortunately, there are two coyotes where we don't have lat/lon data from, so i'm going to remove them since we we won't be able to use them in our analysis
+coy_trim <- coy_trim %>% 
+  filter(!is.na(latitude))
+View(coy_trim)
+
+#cool! now we have a dataframe with 94 entries that we can use to run our analysis.
+```
+
+```{r data_vis}
+#just for fun, i want to look at some potential trends!
+#need to make sure R views lat/long as continuous data
+coy_trim$latitude <- as.numeric(coy_trim$latitude)
+coy_trim$longitude <- as.numeric(coy_trim$longitude)
+
+#some basic plots
+ggplot(coy_trim, aes(x=latitude, y=total_hookworms)) + #denotes x and y
+  geom_point() + #denotes scatterplot
+  geom_smooth(formula = y ~ x, method = "lm") #adds simple line of best fit
+
+ggplot(coy_trim, aes(x=longitude, y=total_hookworms)) +
+  geom_point() +
+  geom_smooth(formula = y ~ x, method = "lm")
+
+#doesn't look like there are strong lat/lon trends, which is fine!
+
+#now i want to plot all our points on a map
+#base map layer
+bounds<-c(left=-122.7, bottom=47.1, right=-122, top=48.5)
+mid_x <- (bounds["left"] + bounds["right"]) / 2
+bottom_y <- bounds["bottom"]
+top_y <- bounds["top"]
+mid_y <- (bottom_y + top_y) / 2
+base_map <- get_stadiamap(bounds, zoom = 12, maptype = "stamen_terrain_background", extent="device")
+ggmap(base_map)
+#plot map
+coyote_map <- ggmap(base_map) +
+  geom_point(data=coy_trim, aes(x=longitude, y=latitude), 
+             position=position_jitter(width=0.001, height=0.001), 
+             shape=21, size=3, stroke=0.5)
+coyote_map
+
+#cool! we can see from this map that our coyotes are spread around the puget sound area, not just in seattle
+```
+
+```{r mapping_parks}
+#still working on this
 ```
