@@ -3,6 +3,8 @@ title: "Coyotepark"
 output: html_document
 ---
 
+# Data Loading
+
 ```{r loading_data}
 library(here)
 library(tidyverse)
@@ -11,10 +13,18 @@ library(ggmap)
 library(mapdata)
 library(maps)
 library(mapproj)
+library(glmmTMB)
+library(ggeffects)
+library(lme4)
+library(DHARMa)
+library(performance)
+
 hookworm <- read.csv(here("Data","hw_data_for_gabby.csv"))
 animal_info <- read.csv(here("Data","carcasses_5-7-25.csv"))
 #testing gabby github issue
 ```
+
+First we have to combine our hookworm dataset and the animal info.
 
 ```{r combining_datasets}
 #we know we'll want one datasheet that has both the hookworm data for each coyote, but also the metadata (ex: lat/long, animal size, etc). We can combine our datasets by either the 'Sample.ID' column or the 'Prep.Number' column, but in order to work, the entries have to match EXACTLY, and I noticed in the hookworm dataframe, the Sample.ID entries are lowercase, whereas in the animal_info dataframe, they're uppercase. So I'm going to combine the two sheets using the Prep.Number column. 
@@ -36,6 +46,8 @@ View(coy_trim)
 
 #cool! now we have a dataframe with 94 entries that we can use to run our analysis.
 ```
+
+Before we do any specific analyses, let's take a basic look at some trends.
 
 ```{r data_vis}
 #just for fun, i want to look at some potential trends!
@@ -73,6 +85,122 @@ coyote_map
 #cool! we can see from this map that our coyotes are spread around the puget sound area, not just in seattle
 ```
 
-```{r mapping_parks}
-#still working on this
+#Analysis
+
+Where can we take this analysis?
+1. Making a continuous gradient map of risk across the whole system (like Chelsea's schisto paper)
+2. Analyzing disease incidence along an urban-rural gradient
+3. Mapping each coyote to a nearby park within the city of Seattle
+
+## Yasmine Population Density Data
+
+```{r uploading_yas_popdata}
+#first loading in the data
+popdens <- read.csv(here("Data","carc_pts_with_covars.csv"))
+
+#next trimming it to ONLY include the population data and the prep #, and remove all non-coyotes
+popdens_2 <- popdens %>%
+  filter(species == "Coyote") %>%
+  select(c(prep_number, popdens_1000m, popdens_2000m, popdens_3000m))
+
+#now merging these with our existing sheet (yay)
+coy_final<-merge(coy_trim, popdens_2, by.x = "prep_number", by.y = "prep_number", all.x = TRUE)
+
+#making sure R reads columns correctly
+coy_final$latitude <- as.numeric(coy_final$latitude)
+coy_final$longitude <- as.numeric(coy_final$longitude)
+coy_final$weight_g <- as.numeric(coy_final$weight_g)
+
+#dropping coyotes with N/A weight or age
+coy_final <- coy_final %>% 
+  filter(!is.na(weight_g)) %>%
+  filter(!is.na(age))
+```
+
+```{r yas_models}
+ggplot(coy_final, aes(x=popdens_3000m, y=total_hookworms)) +
+  geom_point() +
+  geom_smooth(formula = y ~ x, method = "lm")
+
+#looks to be a slightly negative trend here! but now we need to model it...
+#to decide what kind of model to use, i'll make a histogram to see the shape of the data
+
+hist(coy_final$total_hookworms)
+
+#see how this histogram has a TON of values on the low end, and very few on the high end? this is a classic shape for parasite data (many hosts have no/low infections, a few hosts have severe infections) which you might remember from parasite ecology, called an aggregated distribution. it's much better to use a distribution called a "negative binomial" distribution, which takes into account the way count/parasite data is usually shaped.
+
+# we have to pick out our predictors! crash course incoming BUT... think of predictors as the variables that will be important in our model. here we want to test what influences hookworm burden. predictors of interest will be: lat, long, age and size of coyote, and popdens. 
+
+#more complicated models have trouble "converging", so that's something i'll work through below!
+
+#simple model, no weight, converges :-)
+yas1 <- glmmTMB(total_hookworms ~ popdens_3000m + (1|latitude) + (1|age), data=coy_final, family=nbinom12)
+summary(yas1)
+
+#model including weight doesn't converge :-(
+yas2 <- glmmTMB(total_hookworms ~ popdens_3000m + (1|latitude) + (1|age) + (1|weight_g), data=coy_final, family=nbinom12)
+summary(yas2)
+
+#what if we try length?
+yas3 <- glmmTMB(total_hookworms ~ popdens_3000m + (1|latitude) + (1|age) + (1|total_length_mm), data=coy_final, family=nbinom12)
+summary(yas3)
+
+#yay, that works much better! i think weight is tricky for this model because it has HUGE variation, whereas the total length has less. both measure the animal size, so i'm not sure one is better or worse- talk to yasmine?
+```
+
+```{r model_diagnostics}
+models <- list(yas1, yas3)
+model_names <- c("yas1", "yas3")
+
+#model residuals and diagnostics
+#these are measures of how well the model fits the data, and if there are any significant outliers! this code will pop out a bunch of graphs. we hope that NONE of them are significant, because any significance here means our models are not good
+residual_summaries_richness <- map2_df(models, model_names, function(model, name) {
+  sim <- simulateResiduals(fittedModel = model, plot = FALSE, re.form=NULL)
+  data.frame(
+    model = name,
+    dispersion = testDispersion(sim)$p.value,
+    uniformity = testUniformity(sim)$p.value,
+    outliers = testOutliers(sim)$p.value,
+  )
+})
+#yay, no significance!
+
+#AIC
+#aic measures the "loss" of information that happens when you create a model. for this, a lower number is better. 
+AIC(yas1)
+AIC(yas3)
+#yas3 has the lower AIC! so we'll stick with that one moving forward
+```
+
+```{r yas_plots}
+#this first line tells your plot which model to include!
+yas3_mplot <- ggpredict(yas3,c("popdens_3000m"))
+
+yas3_plot <- plot(yas3_mplot, show_data = TRUE) + 
+  xlab("human population density") +
+  ylab("predicted hookworm count")
+
+#cool!!! we are seeing clearly in this graph that the risk of coyote hookworm is HIGHER when there are LESS human population density. we can talk about how to interpret this soon!!!
+```
+## Mapping Coyotes to Parks
+
+```{r seattle}
+# first we should trim our data to include only the coyotes within the seattle metro area!!
+#northerly bound: 145th st, or 47.734110
+#southerly bound: kind of haphazard, but i did my best estimate at 47.495584
+
+coy_seattle <- coy_final %>%
+  filter(latitude < 47.734110) %>%
+  filter(latitude > 47.495584)
+
+#ok... that only leaves us with 12 data points, not enough for an analysis! so im gonna expand our search frame up to about everett and down to seatac.
+
+coy_metro <- coy_final %>%
+  filter(latitude < 48.017612) %>%
+  filter(latitude > 47.434439)
+
+#37 data points... still not a lot but more to work with!
+
+#next steps: see those points on a map, connect them to closest parks, see if park risk factor is a useful factor in a model!
+
 ```
