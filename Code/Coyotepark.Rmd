@@ -201,6 +201,21 @@ coy_metro <- coy_final %>%
 
 #37 data points... still not a lot but more to work with!
 
+#mapping!
+bounds<-c(left=-122.7, bottom=47.4, right=-122, top=48.02)
+mid_x <- (bounds["left"] + bounds["right"]) / 2
+bottom_y <- bounds["bottom"]
+top_y <- bounds["top"]
+mid_y <- (bottom_y + top_y) / 2
+base_map <- get_stadiamap(bounds, zoom = 12, maptype = "stamen_terrain_background", extent="device")
+ggmap(base_map)
+#plot map
+coyote_sea_map <- ggmap(base_map) +
+  geom_point(data=coy_metro, aes(x=longitude, y=latitude), 
+             position=position_jitter(width=0.001, height=0.001), 
+             shape=21, size=3, stroke=0.5)
+coyote_sea_map
+
 #next steps: see those points on a map, connect them to closest parks, see if park risk factor is a useful factor in a model!
 
 ```
