@@ -279,9 +279,11 @@ tukey
 
 ## Gradient Maps
 
-```{r gradient}
-#ok this is gonna be the hardest part i fear!! must upload the map using a different program. for reference, i am following this resource:
+```{r basic_map}
+#ok this is gonna be the hardest part i fear!! must upload the map using a different program. for reference, i am following mainly these resources:
 # https://www.andrewheiss.com/blog/2023/07/28/gradient-map-fills-r-sf/
+# https://bartholomatt.net/posts/census_maps_part2/
+# https://library.virginia.edu/data/articles/spatial-r-using-sf-package
 
 #first loading our base map!
 # Geographic data from the US Census
@@ -297,19 +299,117 @@ wa_state <- states(cb = TRUE, resolution = "500k", year = 2022) %>%
 wa_counties <- counties(state = "53", cb = TRUE, resolution = "500k", year = 2022) %>%
   st_transform(wa_crs)
 #skipping adding water bc it was really confusing to me
+wa <-  'WA'
+wac <- c("King", "Pierce", "Snohomish", "Island", "Skagit", "Whatcom", "San Juan", "Mason", "Jefferson", "Clallam", "Kitsap", "Thurston")
+wa_water <- area_water(wa, wac)
+landmass_data = counties(cb = TRUE, state = wa)
+
+#transform our coyote dataframe into sf data
+coy_sf <- st_as_sf(as.data.frame(coy_final), coords = c("longitude", "latitude"), remove = FALSE, crs = st_crs(wa_state))
+View(coy_sf)
+
+st_crs(wa_state) == st_crs(coy_sf)
 
 #plot
 plot_initial <- ggplot() +
   geom_sf(data = wa_state, fill = "grey20") +
-  geom_point(data = coy_final, aes(x=longitude, y=latitude), size = 0.5, color = "grey50")
+  geom_sf(data = coy_sf, size = 0.5, color = "grey50") +
+  #geom_point(data = coy_final, aes(x=longitude, y=latitude), size = 0.8, color = "grey50") +
+  coord_sf(crs = wa_crs)
 plot_initial
 
 #cool! can i now trim this map to a smaller area of interest for us?
 plot_initial <- ggplot() +
   geom_sf(data = wa_state, fill = "grey20") +
-  geom_point(data = coy_final, aes(x=abs(longitude), y=latitude), size = 0.5, color = "grey50") +
+  geom_sf(data = coy_sf, size = 0.5, color = "grey50") +
   xlim(123, 121.6) +
-  ylim(47, 49)
+  ylim(47, 49) +
+  theme_void()
 plot_initial
 #yippeee
+
+#here is the main issue: the coyote coordinates only plot properly when in EPSG:4326. but because this is in degrees not m, i cant do the below grid transformations. how do i make the coyote plot accurately in m?
+
+```
+
+```{r grid_gradient}
+#ok now the weird stuff
+# Spit the state area into a 20x20 grid
+wa_grid <- wa_state %>% 
+  st_make_grid(n = c(25, 25))
+
+wa_grid_map <- st_intersection(wa_state, wa_grid) %>% 
+  st_as_sf() %>% 
+  mutate(grid_id = 1:n())
+
+#look at plot
+ggplot() +
+  geom_sf(data = wa_grid_map) +
+  #geom_sf(data = wa_grid, alpha = 0.3) +
+  geom_sf(data = wa_water, fill = 'white',color = NA, aes(geometry = geometry)) +
+  #theme(panel.background = element_rect(fill = '#cce6ff', color = NA)) +
+  xlim(-123, -121.6) +
+  ylim(47, 49) 
+  #theme_void()
+
+#ok now we want to figure out the number of hookworms per grid
+#first need to take our dataframe and transform it into spatial data
+coy.sf <- st_as_sf(as.data.frame(coy_final), coords = c("longitude", "latitude"), remove = FALSE, crs = wa_crs)
+plot(coy.sf$geometry)
+st_crs(coy.sf)$epsg
+st_crs(wa_grid_map)$epsg
+
+#make sure it plots correctly
+ggplot() +
+  geom_sf(data = wa_grid_map) +
+  #geom_sf(data = wa_grid, alpha = 0.3) +
+  geom_sf(data = wa_water, fill = 'white',color = NA, aes(geometry = geometry)) +
+  #theme(panel.background = element_rect(fill = '#cce6ff', color = NA)) +
+  geom_sf(data = coy_sf, size = 3) +
+  xlim(123, 121.6) +
+  ylim(47, 49) +
+  theme_void()
+
+#NICE!!! 
+
+#can we make a grid gradient representing number of hookworms/coyotes?
+coyotes_per_grid_box <- wa_grid_map %>% 
+  st_join(coy_sf) %>% 
+  group_by(grid_id) %>% 
+  summarize(total = sum(total_hookworms))
+
+#this is how we plot it
+ggplot() +
+  geom_sf(data = wa_state) +
+  geom_sf(data = coyotes_per_grid_box, aes(fill = total), color = NA) +
+  #geom_sf(data = wa_grid, alpha = 0.3) +
+  geom_sf(data = wa_water, fill = 'white',color = NA, aes(geometry = geometry)) +
+  #theme(panel.background = element_rect(fill = '#cce6ff', color = NA)) +
+  geom_sf(data = coy.sf, size = 3) +
+  scale_fill_viridis_c(option = "magma", guide = "none") +
+  xlim(123, 121.6) +
+  ylim(47, 49) +
+  theme_void()
+
+#NOT WORKING!! :-(
+
+#what about gradient??
+# Convert the campground coordinates to a ppp object with a built-in window
+coy.sf2 <- st_as_sf(as.data.frame(coy.sf), coords = c("longitude", "latitude"), remove = TRUE, crs = 4326)
+coy_ppp <- as(coy.sf2, "Spatial")
+coy_ppp2 <- as(coy.sf2, "ppp")
+coyotes_ppp <- as.ppp(coy.sf2$geometry)
+
+coy.sf.utm <- st_transform(coy.sf2, 32149)
+wa_state_utm <- st_transform(wa_state, 32149)
+coy.ppp <- as.ppp(coy_sf$geometry, W = as.owin(wa_state_utm)) 
+
+# Check to see if it worked
+plot(coy.ppp)
+
+# Create a stars object of the density of coyotes
+density_coy_stars <- stars::st_as_stars(density(coy.ppp, dimyx = 300))
+
+# Check to see what it looks like
+plot(density_coy_stars)
 ```
