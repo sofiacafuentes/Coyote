@@ -18,6 +18,11 @@ library(ggeffects)
 library(lme4)
 library(DHARMa)
 library(performance)
+library(sf)
+library(spatstat)
+library(tigris)
+library(rnaturalearth)
+library(patchwork)
 
 hookworm <- read.csv(here("Data","hw_data_for_gabby.csv"))
 animal_info <- read.csv(here("Data","carcasses_5-7-25.csv"))
@@ -270,4 +275,41 @@ summary(coy_anova)
 tukey <- TukeyHSD(coy_anova)
 tukey
 #here we see no singificant difference between any of the parks!!
+```
+
+## Gradient Maps
+
+```{r gradient}
+#ok this is gonna be the hardest part i fear!! must upload the map using a different program. for reference, i am following this resource:
+# https://www.andrewheiss.com/blog/2023/07/28/gradient-map-fills-r-sf/
+
+#first loading our base map!
+# Geographic data from the US Census
+options(tigris_use_cache = TRUE)
+Sys.setenv(TIGRIS_CACHE_DIR = "maps")
+wa_crs <- st_crs("EPSG:4326")
+
+#state
+wa_state <- states(cb = TRUE, resolution = "500k", year = 2022) %>% 
+  filter(STUSPS == "WA") %>% 
+  st_transform(wa_crs)
+#counties
+wa_counties <- counties(state = "53", cb = TRUE, resolution = "500k", year = 2022) %>%
+  st_transform(wa_crs)
+#skipping adding water bc it was really confusing to me
+
+#plot
+plot_initial <- ggplot() +
+  geom_sf(data = wa_state, fill = "grey20") +
+  geom_point(data = coy_final, aes(x=longitude, y=latitude), size = 0.5, color = "grey50")
+plot_initial
+
+#cool! can i now trim this map to a smaller area of interest for us?
+plot_initial <- ggplot() +
+  geom_sf(data = wa_state, fill = "grey20") +
+  geom_point(data = coy_final, aes(x=longitude, y=latitude), size = 0.5, color = "grey50") +
+  xlim(-121, -123) +
+  ylim(47, 49)
+plot_initial
+#this not working yet but im on it
 ```
