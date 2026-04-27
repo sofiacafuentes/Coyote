@@ -176,9 +176,13 @@ AIC(yas3)
 #this first line tells your plot which model to include!
 yas3_mplot <- ggpredict(yas3,c("popdens_3000m"))
 
+#change plot
 yas3_plot <- plot(yas3_mplot, show_data = TRUE) + 
   xlab("human population density") +
   ylab("predicted hookworm count")
+
+#display plot
+yas3_plot
 
 #cool!!! we are seeing clearly in this graph that the risk of coyote hookworm is HIGHER when there are LESS human population density. we can talk about how to interpret this soon!!!
 ```
@@ -218,4 +222,52 @@ coyote_sea_map
 
 #next steps: see those points on a map, connect them to closest parks, see if park risk factor is a useful factor in a model!
 
+```
+
+```{r seattle_parks}
+View(coy_metro)
+
+#i can't think of an automatic way to do this, so im gonna manually assign each coyote to a park by creating a vector in the same order
+
+parks <- c("ballinger", "brightwater", "north creek", "hans jensen", "paine field", "bridle trails", "paine field", "picnic point", "dakota", "paine field", "dakota", "hans jensen", "north creek", "hans jensen", "paine field", "hans jensen", "picnic point", "paine field", "paine field", "paine field", "squak mountain", "paine field", "discovery", "paine field", "paine field", "paine field", "blyth", "paine field", "newport bluffs", "magnuson", "paine field", "paine field", "paine field", "picnic point", "mercer slough", "paine field", "discovery")
+
+#next add this column to datasheet
+coy_metro$parks <- parks
+
+#lets do some data visualization!
+ggplot(data= coy_metro, aes(x=parks, y=total_hookworms)) +
+  geom_boxplot()
+
+#promising... now lets try a model
+yas4 <- glmmTMB(total_hookworms ~ parks, data=coy_metro, family=nbinom12)
+summary(yas4)
+#even the simplest of these models doesn't converge, maybe because there are some parks that only have 1 replication. let's drop those
+
+coy_metro_fil <- coy_metro %>%
+  filter(parks != "ballinger") %>%
+  filter(parks != "brightwater") %>%
+  filter(parks != "bridle trails") %>%
+  filter(parks != "squak mountain") %>%
+  filter(parks != "blyth") %>%
+  filter(parks != "newport bluffs") %>%
+  filter(parks !="magnuson") %>%
+  filter(parks != "mercer slough")
+
+coy_metro_fil$parks <- as.character(coy_metro_fil$parks)
+
+#data vis
+ggplot(data= coy_metro_fil, aes(x=parks, y=total_hookworms)) +
+  geom_boxplot()
+
+#making an anova to compare multiple groups
+coy_anova <- aov(total_hookworms ~ parks, data = coy_metro_fil)
+hist(coy_anova$residuals)
+qqPlot(coy_anova$residuals, id = FALSE)
+summary(coy_anova)
+#not significant, and there are so few points that its difficult to make big assumptions about this data!! :-(
+
+#tukey compares each group individually
+tukey <- TukeyHSD(coy_anova)
+tukey
+#here we see no singificant difference between any of the parks!!
 ```
