@@ -307,9 +307,9 @@ plot_initial
 #cool! can i now trim this map to a smaller area of interest for us?
 plot_initial <- ggplot() +
   geom_sf(data = wa_state, fill = "grey20") +
-  geom_point(data = coy_final, aes(x=longitude, y=latitude), size = 0.5, color = "grey50") +
-  xlim(-121, -123) +
+  geom_point(data = coy_final, aes(x=abs(longitude), y=latitude), size = 0.5, color = "grey50") +
+  xlim(123, 121.6) +
   ylim(47, 49)
 plot_initial
-#this not working yet but im on it
+#yippeee
 ```
