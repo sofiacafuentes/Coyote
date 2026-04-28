@@ -189,10 +189,22 @@ yas3_plot <- plot(yas3_mplot, show_data = TRUE) +
 #display plot
 yas3_plot
 
+#new plot
+sofplot <-plot(yas3_mplot, show_data = TRUE, color = "#b73779") +
+  xlab("human population density") +
+  ylab("predicted hookworm count") +
+  theme_classic() +
+  theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(title = "Main Title", subtitle = "Optional Subtitle", caption = "Data source info") 
+sofplot
+#scale_fill_manual(values = "#b73779") ?
+#geom_line(color = "#b73779") + ?
+
 #cool!!! we are seeing clearly in this graph that the risk of coyote hookworm is HIGHER when there are LESS human population density. we can talk about how to interpret this soon!!!
 ```
-## Mapping Coyotes to Parks
 
+## Mapping Coyotes to Parks
 ```{r seattle}
 # first we should trim our data to include only the coyotes within the seattle metro area!!
 #northerly bound: 145th st, or 47.734110
