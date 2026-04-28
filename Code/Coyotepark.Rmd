@@ -321,7 +321,7 @@ plot_initial
 #cool! can i now trim this map to a smaller area of interest for us?
 plot_initial <- ggplot() +
   geom_sf(data = wa_state, fill = "grey20") +
-  geom_sf(data = coy_sf, size = 0.5, color = "grey50") +
+  geom_sf(data = coy_sf, size = 0.5, color = "lightgrey") +
   xlim(123, 121.6) +
   ylim(47, 49) +
   theme_void()
@@ -333,12 +333,29 @@ plot_initial
 ```
 
 ```{r grid_gradient}
+#need to reset state/coy data in projection system that uses m
+coy_sf2 <- st_set_crs(coy_sf, "EPSG:32149")
+coy_sf2 <-  st_transform(coy_sf, "EPSG:32149")
+View(coy_sf2)
+
+wa_state2 <- st_set_crs(wa_state, "EPSG:32149")
+wa_state2 <-  st_transform(wa_state, "EPSG:32149")
+
+plot_test <- ggplot() +
+  geom_sf(data = wa_state2, fill = "grey20") +
+  geom_sf(data = coy_sf2, size = 0.5, color = "lightgrey") +
+  xlim(320000, 400000) +
+  ylim(190000, 400000)
+plot_test
+
+#i literally cant believe it finally worked lol
+
 #ok now the weird stuff
 # Spit the state area into a 20x20 grid
-wa_grid <- wa_state %>% 
-  st_make_grid(n = c(25, 25))
+wa_grid <- wa_state2 %>% 
+  st_make_grid(n = c(50, 50))
 
-wa_grid_map <- st_intersection(wa_state, wa_grid) %>% 
+wa_grid_map <- st_intersection(wa_state2, wa_grid) %>% 
   st_as_sf() %>% 
   mutate(grid_id = 1:n())
 
@@ -348,61 +365,34 @@ ggplot() +
   #geom_sf(data = wa_grid, alpha = 0.3) +
   geom_sf(data = wa_water, fill = 'white',color = NA, aes(geometry = geometry)) +
   #theme(panel.background = element_rect(fill = '#cce6ff', color = NA)) +
-  xlim(-123, -121.6) +
-  ylim(47, 49) 
+  xlim(320000, 400000) +
+  ylim(190000, 400000) 
   #theme_void()
-
-#ok now we want to figure out the number of hookworms per grid
-#first need to take our dataframe and transform it into spatial data
-coy.sf <- st_as_sf(as.data.frame(coy_final), coords = c("longitude", "latitude"), remove = FALSE, crs = wa_crs)
-plot(coy.sf$geometry)
-st_crs(coy.sf)$epsg
-st_crs(wa_grid_map)$epsg
-
-#make sure it plots correctly
-ggplot() +
-  geom_sf(data = wa_grid_map) +
-  #geom_sf(data = wa_grid, alpha = 0.3) +
-  geom_sf(data = wa_water, fill = 'white',color = NA, aes(geometry = geometry)) +
-  #theme(panel.background = element_rect(fill = '#cce6ff', color = NA)) +
-  geom_sf(data = coy_sf, size = 3) +
-  xlim(123, 121.6) +
-  ylim(47, 49) +
-  theme_void()
-
-#NICE!!! 
 
 #can we make a grid gradient representing number of hookworms/coyotes?
 coyotes_per_grid_box <- wa_grid_map %>% 
-  st_join(coy_sf) %>% 
+  st_join(coy_sf2) %>% 
   group_by(grid_id) %>% 
-  summarize(total = sum(total_hookworms))
+  summarize(total = sum(!is.na(total_hookworms)))
 
 #this is how we plot it
-ggplot() +
-  geom_sf(data = wa_state) +
+hookworm_grid <- ggplot() +
+  geom_sf(data = wa_state2, fill = NA, color = "black", linewidth = 0.25) +
   geom_sf(data = coyotes_per_grid_box, aes(fill = total), color = NA) +
-  #geom_sf(data = wa_grid, alpha = 0.3) +
-  geom_sf(data = wa_water, fill = 'white',color = NA, aes(geometry = geometry)) +
-  #theme(panel.background = element_rect(fill = '#cce6ff', color = NA)) +
-  geom_sf(data = coy.sf, size = 3) +
+  geom_sf(data = wa_water, fill = '#cce6ff',color = NA, aes(geometry = geometry)) +
+  geom_sf(data = coy_sf2, size = .3, color="grey80") +
   scale_fill_viridis_c(option = "magma", guide = "none") +
-  xlim(123, 121.6) +
-  ylim(47, 49) +
+  xlim(320000, 400000) +
+  ylim(190000, 400000) +
   theme_void()
 
-#NOT WORKING!! :-(
+hookworm_grid
+
+#OMG IT WORKED FINALLY :-P probably need to add a legend to this!
 
 #what about gradient??
 # Convert the campground coordinates to a ppp object with a built-in window
-coy.sf2 <- st_as_sf(as.data.frame(coy.sf), coords = c("longitude", "latitude"), remove = TRUE, crs = 4326)
-coy_ppp <- as(coy.sf2, "Spatial")
-coy_ppp2 <- as(coy.sf2, "ppp")
-coyotes_ppp <- as.ppp(coy.sf2$geometry)
-
-coy.sf.utm <- st_transform(coy.sf2, 32149)
-wa_state_utm <- st_transform(wa_state, 32149)
-coy.ppp <- as.ppp(coy_sf$geometry, W = as.owin(wa_state_utm)) 
+coy.ppp <- as.ppp(coy_sf2$geometry, W = as.owin(wa_state2)) 
 
 # Check to see if it worked
 plot(coy.ppp)
@@ -412,4 +402,17 @@ density_coy_stars <- stars::st_as_stars(density(coy.ppp, dimyx = 300))
 
 # Check to see what it looks like
 plot(density_coy_stars)
+
+wa_coy_density <- st_as_sf(density_coy_stars) %>%
+  st_set_crs("EPSG:32149")
+
+plot_density <- ggplot() +
+  geom_sf(data = wa_coy_density, aes(fill = v), color = NA) +
+  geom_sf(data = wa_state2, fill = NA, color = "black", linewidth = 0.25) +
+  scale_fill_viridis_c(option = "magma", guide = "none") +
+  geom_sf(data = wa_water, fill = '#cce6ff',color = NA, aes(geometry = geometry)) +
+  geom_sf(data = coy_sf2, size = 0.5, color = "lightgrey") +
+  xlim(320000, 400000) +
+  ylim(190000, 400000)
+plot_density
 ```
