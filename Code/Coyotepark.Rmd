@@ -378,7 +378,7 @@ coyotes_per_grid_box <- wa_grid_map %>%
 #this is how we plot it
 hookworm_grid <- ggplot() +
   geom_sf(data = wa_state2, fill = NA, color = "black", linewidth = 0.25) +
-  geom_sf(data = coyotes_per_grid_box, aes(fill = total), color = NA) +
+  geom_sf(data = coyotes_per_grid_box, aes(fill = total), color = "black") +
   geom_sf(data = wa_water, fill = '#cce6ff',color = NA, aes(geometry = geometry)) +
   geom_sf(data = coy_sf2, size = .3, color="grey80") +
   scale_fill_viridis_c(option = "magma", guide = "none") +
