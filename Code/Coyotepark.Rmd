@@ -150,6 +150,12 @@ summary(yas2)
 yas3 <- glmmTMB(total_hookworms ~ popdens_3000m + (1|latitude) + (1|age) + (1|total_length_mm), data=coy_final, family=nbinom12)
 summary(yas3)
 
+#testing some other models!
+yas4 <- glmmTMB(total_hookworms ~ popdens_3000m + (1|latitude) + (1|age) + (1|total_length_mm), data=coy_final, family=poisson)
+summary(yas4)
+
+plot(coy_final$latitude, coy_final$popdens_3000m)
+
 #yay, that works much better! i think weight is tricky for this model because it has HUGE variation, whereas the total length has less. both measure the animal size, so i'm not sure one is better or worse- talk to yasmine?
 ```
 
@@ -196,12 +202,15 @@ sofplot <-plot(yas3_mplot, show_data = TRUE, color = "#b73779") +
   theme_classic() +
   theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank()) +
   theme(plot.title = element_text(hjust = 0.5)) +
-  labs(title = "Main Title", subtitle = "Optional Subtitle", caption = "Data source info") 
+  labs(title = "Predicted Hookworm vs Population Density", caption = "Data courtesy of Dr. Yasmine Hentati") 
 sofplot
 #scale_fill_manual(values = "#b73779") ?
 #geom_line(color = "#b73779") + ?
 
 #cool!!! we are seeing clearly in this graph that the risk of coyote hookworm is HIGHER when there are LESS human population density. we can talk about how to interpret this soon!!!
+
+#saving graphs
+ggsave("model_plot_2.png", plot=sofplot, width=5, height=3, dpi=300)
 ```
 
 ## Mapping Coyotes to Parks
@@ -396,9 +405,17 @@ hookworm_grid <- ggplot() +
   scale_fill_viridis_c(option = "magma", guide = "none") +
   xlim(320000, 400000) +
   ylim(190000, 400000) +
-  theme_void()
+  theme_void() +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(), 
+        axis.title.y =element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
 
 hookworm_grid
+
+ggsave("plot_grid.png", plot=hookworm_grid, width=3, height=5, dpi=300)
 
 #OMG IT WORKED FINALLY :-P probably need to add a legend to this!
 
@@ -423,8 +440,16 @@ plot_density <- ggplot() +
   geom_sf(data = wa_state2, fill = NA, color = "black", linewidth = 0.25) +
   scale_fill_viridis_c(option = "magma", guide = "none") +
   geom_sf(data = wa_water, fill = '#cce6ff',color = NA, aes(geometry = geometry)) +
-  geom_sf(data = coy_sf2, size = 0.5, color = "lightgrey") +
+  geom_sf(data = coy_sf2, size = 0.5, color = "green") +
   xlim(320000, 400000) +
-  ylim(190000, 400000)
+  ylim(190000, 400000) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(), 
+        axis.title.y =element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
 plot_density
+
+ggsave("plot_density.png", plot=plot_density, width=3, height=5, dpi=300)
 ```
