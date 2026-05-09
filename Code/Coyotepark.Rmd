@@ -22,7 +22,6 @@ library(sf)
 library(spatstat)
 library(tigris)
 library(rnaturalearth)
-library(patchwork)
 
 hookworm <- read.csv(here("Data","hw_data_for_gabby.csv"))
 animal_info <- read.csv(here("Data","carcasses_5-7-25.csv"))
@@ -120,6 +119,14 @@ coy_final$weight_g <- as.numeric(coy_final$weight_g)
 coy_final <- coy_final %>% 
   filter(!is.na(weight_g)) %>%
   filter(!is.na(age))
+
+#adding area
+area1 <- read.csv(here("Data","all_coyote_consumers_cleaned.csv"))
+area1$location <- area1$area
+area2 <- area1 %>% 
+  dplyr::select(sample_id, location) %>%
+  rename(prep_number = sample_id)
+coy_area<-merge(coy_final, area2, by.x = "prep_number", by.y = "prep_number", all.x = TRUE)
 ```
 
 ```{r yas_models}
@@ -150,13 +157,16 @@ summary(yas2)
 yas3 <- glmmTMB(total_hookworms ~ popdens_3000m + (1|latitude) + (1|age) + (1|total_length_mm), data=coy_final, family=nbinom12)
 summary(yas3)
 
+#yay, that works much better! i think weight is tricky for this model because it has HUGE variation, whereas the total length has less. both measure the animal size, so i'm not sure one is better or worse- talk to yasmine?
+
 #testing some other models!
 yas4 <- glmmTMB(total_hookworms ~ popdens_3000m + (1|latitude) + (1|age) + (1|total_length_mm), data=coy_final, family=poisson)
 summary(yas4)
 
-plot(coy_final$latitude, coy_final$popdens_3000m)
-
-#yay, that works much better! i think weight is tricky for this model because it has HUGE variation, whereas the total length has less. both measure the animal size, so i'm not sure one is better or worse- talk to yasmine?
+#testing with location as random effect instead of latitude
+yas5 <- glmmTMB(total_hookworms ~ popdens_3000m + (1|location) + (1|total_length_mm), data=coy_area, family=nbinom12())
+summary(yas5)
+#hmm... technically converges but gives warning. gonna take more time to work thru this. maybe we can postpone!
 ```
 
 ```{r model_diagnostics}
