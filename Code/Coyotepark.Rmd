@@ -450,7 +450,7 @@ plot_density <- ggplot() +
   geom_sf(data = wa_state2, fill = NA, color = "black", linewidth = 0.25) +
   scale_fill_viridis_c(option = "magma", guide = "none") +
   geom_sf(data = wa_water, fill = '#cce6ff',color = NA, aes(geometry = geometry)) +
-  geom_sf(data = coy_sf2, size = 0.5, color = "green") +
+  geom_sf(data = coy_sf2, size = 1, color = "#1DE307") +
   xlim(320000, 400000) +
   ylim(190000, 400000) +
   theme(axis.title.x=element_blank(),
@@ -461,5 +461,5 @@ plot_density <- ggplot() +
         axis.ticks.y=element_blank())
 plot_density
 
-ggsave("plot_density.png", plot=plot_density, width=3, height=5, dpi=300)
+ggsave("plot_density2.png", plot=plot_density, width=3, height=5, dpi=300)
 ```
